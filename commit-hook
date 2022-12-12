@@ -59,11 +59,11 @@ for plugin in $CMT_PLUGIN_ROOT/* ; do
             debug "calling $(basename $plugin) plugin 'hook'"
             if ! $plugin/$CMT_HOOK $* ; then
                 error "Plugin's hook script failed"
-                return $?
+                exit $?
             fi
         else
             error "Plugin's check script failed"
-            return $?
+            exit $?
         fi
     fi        
 done
