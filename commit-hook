@@ -56,6 +56,7 @@ for plugin in $CMT_PLUGIN_ROOT/* ; do
     if [[ -f "$plugin/check" && -f "$plugin/$CMT_HOOK" ]] ; then
         debug "Calling $(basename $plugin) plugin 'check' script"
         if $plugin/check ; then
+            info "Plugin $(basename $plugin) enabled"
             debug "calling $(basename $plugin) plugin 'hook'"
             if ! $plugin/$CMT_HOOK $* ; then
                 error "Plugin's hook script failed"

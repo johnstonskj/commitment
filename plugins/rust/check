@@ -1,5 +1,7 @@
 #/usr/bin/env bash
 
 if [[ $CMT_VERBOSE -gt 0 ]] ; then
-   printf "[DEBUG]: Looking for $REPO_ROOT/Cargo.toml to enable Rust plugin"
+   echo "[DEBUG]: Looking for $REPO_ROOT/Cargo.toml
 fi  
+
+test -f $REPO_ROOT/Cargo.toml
