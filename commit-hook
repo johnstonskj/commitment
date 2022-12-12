@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+
+# ======================================================================
+# Functions
+# ======================================================================
+
+debug() {
+    if [[ $CMT_VERBOSE -gt 0 ]] ; then
+        printf "[DEBUG]: %s\n" "$*";
+    fi
+}
+
+info() { printf "[INFO]: %s\n" "$*"; }
+
+error() { printf "[ERROR]: %s\n" "$*" >&2; }
+
+warning() { printf "[WARN]: %s\n" "$*" >&2; }
+
+fatal() {
+    local CODE=$1
+    shift
+    printf "[ERROR]: %s\n" "$*" >&2;
+    exit $CODE
+}
+
+# ======================================================================
+# Environment Variables
+# ======================================================================
+
+export CMT_VERBOSE=0
+
+CMT_SCRIPT=$(readlink -f $0)
+export CMT_HOOK=$(basename $CMT_SCRIPT)
+export CMT_ROOT=$(dirname $CMT_SCRIPT)
+export CMT_PLUGIN_ROOT=$CMT_ROOT/plugins
+
+GIT_HOOK_PATH=$(git config core.hooksPath)
+
+REPO_ROOT=$(git rev-parse --git-dir)
+REPO_ROOT=$(readlink -f $REPO_ROOT)
+export REPO_ROOT=$(dirname $REPO_ROOT)
+
+# ======================================================================
+# Initialization
+# ======================================================================
+
+if [[ ! "$CMT_ROOT" == "$GIT_HOOK_PATH" ]] ; then
+    warning "Warning: script not running from Git hook directory"
+fi
+
+# ======================================================================
+# Run any plugins that think they want to
+# ======================================================================
+
+for plugin in $CMT_PLUGIN_ROOT/* ; do
+    if [[ -f "$plugin/check" && -f "$plugin/$CMT_HOOK" ]] ; then
+        debug "Calling $(basename $plugin) plugin 'check' script"
+        if $plugin/check ; then
+            debug "calling $(basename $plugin) plugin 'hook'"
+            if ! $plugin/$CMT_HOOK $* ; then
+                error "Plugin's hook script failed"
+                return $?
+            fi
+        else
+            error "Plugin's check script failed"
+            return $?
+        fi
+    fi        
+done

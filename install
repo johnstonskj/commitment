@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+SCRIPT=$(readlink -f $0)
+SOURCE=$(dirname $SCRIPT)
+
+GIT_HOOK_DIR=$(git config core.hooksPath)
+TARGET="${GIT_HOOK_DIR/#\~/$HOME}"
+
+ln -s "$SOURCE/commit-hook" "$TARGET/pre-commit"
