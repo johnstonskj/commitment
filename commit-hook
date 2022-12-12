@@ -46,16 +46,26 @@ export REPO_ROOT=$(dirname $REPO_ROOT)
 # Run any plugins that think they want to
 # ======================================================================
 
-for plugin in $CMT_PLUGIN_ROOT/* ; do
-    if [[ -f "$plugin/check" && -f "$plugin/$CMT_HOOK" ]] ; then
-        debug "Calling $(basename $plugin) plugin 'check' script"
-        if $plugin/check ; then
-            info "Plugin $(basename $plugin) enabled"
-            debug "calling $(basename $plugin) plugin 'hook'"
-            if ! $plugin/$CMT_HOOK $* ; then
-                fatal 1 "Plugin's hook script failed ($?)"
-            fi
-        # else nothing, non-zero means No
+if [[ -f "$REPO_ROOT/.commitments" ]] ; then
+    info "Reading plugins from dot-commitments file"
+    while read -r plugin ; do
+        debug "Calling $plugin plugin 'hook'"
+        if ! $CMT_PLUGIN_ROOT/$plugin/$CMT_HOOK $* ; then
+            fatal 1 "Plugin's hook script failed ($?)"
         fi
-    fi        
-done
+    done < "$REPO_ROOT/.commitments"
+else
+    for plugin in $CMT_PLUGIN_ROOT/* ; do
+        if [[ -f "$plugin/check" && -f "$plugin/$CMT_HOOK" ]] ; then
+            debug "Calling $(basename $plugin) plugin 'check' script"
+            if $plugin/check ; then
+                info "Plugin $(basename $plugin) enabled"
+                debug "Calling $(basename $plugin) plugin 'hook'"
+                if ! $plugin/$CMT_HOOK $* ; then
+                    fatal 1 "Plugin's hook script failed ($?)"
+                fi
+            # else nothing, non-zero means No
+            fi
+        fi        
+    done
+fi
