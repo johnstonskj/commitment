@@ -27,7 +27,9 @@ fatal() {
 # Environment Variables
 # ======================================================================
 
-export CMT_VERBOSE=0
+if [[ -z "$CMT_VERBOSE" ]] ; then
+    export CMT_VERBOSE=0
+fi
 
 CMT_SCRIPT=$(readlink -f $0)
 export CMT_HOOK=$(basename $CMT_SCRIPT)
@@ -41,14 +43,6 @@ REPO_ROOT=$(readlink -f $REPO_ROOT)
 export REPO_ROOT=$(dirname $REPO_ROOT)
 
 # ======================================================================
-# Initialization
-# ======================================================================
-
-if [[ ! "$CMT_ROOT" == "$GIT_HOOK_PATH" ]] ; then
-    warning "Warning: script not running from Git hook directory"
-fi
-
-# ======================================================================
 # Run any plugins that think they want to
 # ======================================================================
 
@@ -59,12 +53,9 @@ for plugin in $CMT_PLUGIN_ROOT/* ; do
             info "Plugin $(basename $plugin) enabled"
             debug "calling $(basename $plugin) plugin 'hook'"
             if ! $plugin/$CMT_HOOK $* ; then
-                error "Plugin's hook script failed"
-                exit $?
+                fatal 1 "Plugin's hook script failed ($?)"
             fi
-        else
-            error "Plugin's check script failed"
-            exit $?
+        # else nothing, non-zero means No
         fi
     fi        
 done
