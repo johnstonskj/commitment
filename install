@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash # -*- mode: sh; eval: (sh-set-shell "bash") -*-
 
 if [[ "$1" == "remove" ]]; then
     ACTION=2
@@ -38,7 +38,7 @@ if [[ ${SCOPE} -eq 1 ]]; then
 else
     TARGET="$(pwd)/.git/hooks"
     if [[ ! -d ${TARGET} ]]; then
-        echo "Error, to install locally you must be in a repository root"
+        echo "✗ Error, to install locally you must be in a repository root"
         exit 2
     fi
 fi
@@ -48,15 +48,17 @@ if [[ ${ACTION} -eq 2 ]]; then
     echo "Removing hook ${TARGET}/${HOOK_NAME}"
     if [[ -f ${TARGET}/${HOOK_NAME} ]]; then
         rm "${TARGET}/${HOOK_NAME}"
+        echo "✓ Hook ${HOOK_NAME} removed."
     else
-        echo "Hook not previously installed, no action taken."
+        echo "✓ Hook not previously installed, no action taken."
     fi
 else
     echo "Adding hook ${HOOK_NAME} to ${TARGET}"
     if [[ ! -f ${TARGET}/${HOOK_NAME} ]]; then
         ln -s "${SOURCE}/commitments" "${TARGET}/${HOOK_NAME}"
+        echo "✓ Hook ${HOOK_NAME} installed."
     else
-        echo "Hook already installed, no action taken."
+        echo "✓ Hook already installed, no action taken."
     fi
 
     ENV_DIR=${XDG_CONFIG_HOME:-"${HOME}/.config"}
@@ -71,5 +73,8 @@ else
 
 export CMT_PLUGIN_PATH=${SOURCE}/plugins
 EOF
+        echo "✓ Env-file ${ENV_FILE} created."
+    else
+        echo "✓ Env-file already exists, no action taken."
     fi
 fi

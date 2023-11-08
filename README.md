@@ -5,6 +5,8 @@ Commitment is a very simple shell-based Git hook runner.
 This provides a single script `commitments` that can be linked into a Git `hooks` directory to invoke actual hook functions
 written as shell functions in plugin scripts.
 
+The hook and plugin scripts use the [shlog](https://github.com/johnstonskj/shlog) script for logging functions, but will stub them out if not present.
+
 ## Adding/Removing a Hook
 
 Adding a hook is easy, the `install` script in this directory takes the name of a Git hook and will add a symlink to the
@@ -13,7 +15,6 @@ Adding a hook is easy, the `install` script in this directory takes the name of 
 ``` bash
 ❯ install pre-commit
 ```
-
 
 This installs a *global* hook, i.e. installed in the Git configured global hook directory. This can be done explicitly by
 adding the keyword `global` before the hook name in the command above. Similarly it is possible to install a *local* hook
@@ -35,7 +36,7 @@ keyword `remove`.
 Plugins are loaded by searching a path environment variable, `CMT_PLUGIN_PATH`. Each entry in the path is a directory
 that contains a set of plugins (see next section for the structure of a plugin).
 
-The installer will try and create and `env` file in the `commitments` directory of your local config folder, using
+The installer will try and create an `env` file in the `commitments` directory of your local config folder, using
 the environment variable `XDG_CONFIG_HOME`. This contains the basic configuration with a path to the standard plugin folder.
 
 ```bash

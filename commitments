@@ -15,7 +15,18 @@ if ! type log_critical >/dev/null; then
         source ${SHLOG_SOURCE}
         log_debug "shlog loaded; SHLOG_LEVEL=${SHLOG_LEVEL}"
     else
-        echo "Error: logging script ${SHLOG_SOURCE} not found."
+        echo "Warning: shlog not found, expecting ${SHLOG_SOURCE}."
+        log_fatal() { exit 1; }
+        log_error() {}
+        log_warning() {}
+        log_info() {}
+        log_debug() {}
+        log_trace() {}
+        log_scope_enter() {}
+        log_scope_exit() {}
+        msg_success() { echo $@; }
+        msg_warning() { echo $@; }
+        msg_error() {  echo $@; }
     fi
 fi
 
