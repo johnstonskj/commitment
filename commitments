@@ -1,0 +1,163 @@
+#!/usr/bin/env zsh # -*- mode: sh; eval: (sh-set-shell "zsh") -*-
+
+CMT_SUCCESS=0
+CMT_CONFIG_ERR=1
+CMT_PLUGIN_ERR=2
+CMT_HOOK_FAILED=3
+
+# ======================================================================
+# Initialize Logging
+# ======================================================================
+
+if ! type log_critical >/dev/null; then
+    SHLOG_SOURCE="${XDG_DATA_HOME:-$HOME/.local/share/shlog}/shlog.sh"
+    if [[ -f ${SHLOG_SOURCE} ]]; then
+        source ${SHLOG_SOURCE}
+        log_debug "shlog loaded; SHLOG_LEVEL=${SHLOG_LEVEL}"
+    else
+        echo "Error: logging script ${SHLOG_SOURCE} not found."
+    fi
+fi
+
+# ======================================================================
+# Functions
+# ======================================================================
+
+load_plugin() {
+    local plugin_root=$1
+    local plugin_name=$2
+    local plugin_source="${plugin_root}/${plugin_name}/commitments"
+
+    if [[ -f ${plugin_source} ]]; then
+        log_trace "Loading plugin ${plugin_name} from ${plugin_source}"
+        if ! source "${plugin_source}"; then
+            log_error "failed to load plugin file ${plugin_source}, status $?"
+            return ${CMT_PLUGIN_ERR}
+        fi
+    else
+        log_error "No plugin file found: ${plugin_source}"
+        return ${CMT_CONFIG_ERR}
+    fi
+    return ${CMT_SUCCESS}
+}
+
+plugin_enabled() {
+    local plugin_name=$1
+    local repo_root=$2
+    local fn_name="${plugin_name}_enabled"
+
+    if typeset -f ${fn_name} >/dev/null; then
+        log_trace "Testing if plugin is enabled using function ${fn_name}"
+        ${fn_name} ${repo_root}
+    else
+        log_trace "Plugin enabled by default, no function ${fn_name} found"
+        return ${CMT_SUCCESS}
+    fi
+}
+
+run_plugin_hook() {
+    local plugin_name=$1
+    local hook_name=$2
+    local hook_fn_name="${plugin_name}_${hook_name//-/_}"
+    local repo_root=$3
+
+    log_trace "Attempting to run ${hook_name} (${hook_fn_name})"
+
+    if typeset -f ${hook_fn_name} >/dev/null; then
+        if ! ${hook_fn_name} ${repo_root}; then
+            log_error "${hook_fn_name}, status $?"
+            return ${CMT_HOOK_FAILED}
+        fi
+    else
+        log_info "No function named ${hook_fn_name} in plugin ${plugin_name}"
+    fi
+    return ${CMT_SUCCESS}
+}
+
+run_hook_with_plugin_file() {
+    local hook_name=$1
+    local repo_root=$2
+    local commitment_file=$3
+
+    log_info "Reading plugin list from ${commitment_file}"
+    while read -r plugin ; do
+        log_trace "Found plugin ${plugin} in commitments"
+        log_scope_enter ${plugin}
+        if load_plugin ${plugin}; then
+            if ! run_plugin_hook ${plugin} ${hook_name} ${repo_root}; then
+                log_info "run_plugin_hook returned an error, ${plugin}/${hook_name}, status $?"
+                log_scope_exit ${plugin} $?
+                return ${CMT_HOOK_FAILED}
+            fi
+        else
+            log_error "Failed to load plugin ${plugin}, status $?"
+            log_scope_exit ${plugin} $?
+            return ${CMT_PLUGIN_ERR}
+        fi
+        log_scope_exit ${plugin}
+    done < "${commitment_file}"
+    return ${CMT_SUCCESS}
+}
+
+run_hook_with_any_plugin() {
+    local hook_name=$1
+    local repo_root=$2
+    local plugin_root=$3
+
+    log_info "Finding all plugins in ${plugin_root}"
+    for plugin in ${plugin_root}/* ; do
+        if [[ -d "${plugin}" ]]; then
+            local plugin_name=$(basename ${plugin})
+            log_scope_enter ${plugin_name}
+            if load_plugin ${plugin_root} ${plugin_name}; then
+                if plugin_enabled ${plugin_name} ${repo_root}; then
+                    if ! run_plugin_hook ${plugin_name} ${hook_name} ${repo_root}; then
+                        log_info "run_plugin_hook returned an error, ${plugin}/${hook_name}, status $?"
+                        log_scope_exit ${plugin} $?
+                        return ${CMT_HOOK_FAILED}
+                    fi
+                else
+                    log_info "Plugin ${plugin_name} not enabled in ${repo_root}"
+                fi
+            else
+                log_error "Failed to load plugin ${plugin_name}, status $?"
+                log_scope_exit ${plugin_name} $?
+                return ${CMT_PLUGIN_ERR}
+            fi
+            log_scope_exit ${plugin_name}
+        else
+            log_warning "Ignoring non-directory ${plugin_name} in ${plugin_root}"
+        fi
+    done
+    return ${CMT_SUCCESS}
+}
+
+run_commitments() {
+    local script_path=$1
+    local hook_name=$(basename ${script_path})
+    local commitment_root=$(dirname ${script_path})
+    local plugin_root="${commitment_root}/plugins"
+    local repo_root=$(git rev-parse --git-dir)
+    local repo_root=$(readlink -f ${repo_root})
+    local repo_root=$(dirname ${repo_root})
+    local repo_commitment_file="${repo_root}/.commitments"
+
+    log_info "Commitments, script: ${script_path}"
+    log_trace "Running hook: ${hook_name}, repository: ${repo_root}, plugins: ${plugin_root}"
+
+    if [[ -f ${repo_commitment_file} ]] ; then
+        log_scope_enter "plugin_file"
+        run_hook_with_plugin_file ${hook_name} ${repo_root} ${repo_commitment_file}
+        log_scope_exit "plugin_file" $?
+    else
+        log_scope_enter "any_plugin"
+        run_hook_with_any_plugin ${hook_name} ${repo_root} ${plugin_root}
+        log_scope_exit "any_plugin" $?
+    fi
+}
+
+# ======================================================================
+# It all starts here
+# ======================================================================
+
+run_commitments $(readlink -f $0)

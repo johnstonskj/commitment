@@ -1,9 +1,75 @@
 #!/usr/bin/env bash
 
+if [[ "$1" == "remove" ]]; then
+    ACTION=2
+    shift
+else
+    ACTION=1
+fi
+
+if [[ "$1" == "global" ]]; then
+    SCOPE=1
+    shift
+elif [[ "$1" == "local" ]]; then
+    SCOPE=2
+    shift
+else
+    SCOPE=1
+fi
+
+if [[ -z "$1" ]]; then
+    echo "Usage: install [remove] [global|local] [hook-name]"
+    echo ""
+    echo "    remove       - delete the symlink to the commitments script."
+    echo "    global       - manage symlink in the git global directory."
+    echo "    local        - manage symlink in the current directory."
+    echo "    <hook-name>  - see 'man githooks'."
+    exit 1
+else
+    HOOK_NAME=$1
+fi
+
 SCRIPT=$(readlink -f $0)
 SOURCE=$(dirname $SCRIPT)
 
-GIT_HOOK_DIR=$(git config core.hooksPath)
-TARGET="${GIT_HOOK_DIR/#\~/$HOME}"
+if [[ ${SCOPE} -eq 1 ]]; then
+    GIT_HOOK_DIR=$(git config core.hooksPath)
+    TARGET="${GIT_HOOK_DIR/#\~/$HOME}"
+else
+    TARGET="$(pwd)/.git/hooks"
+    if [[ ! -d ${TARGET} ]]; then
+        echo "Error, to install locally you must be in a repository root"
+        exit 2
+    fi
+fi
 
-ln -s "$SOURCE/commit-hook" "$TARGET/pre-commit"
+
+if [[ ${ACTION} -eq 2 ]]; then
+    echo "Removing hook ${TARGET}/${HOOK_NAME}"
+    if [[ -f ${TARGET}/${HOOK_NAME} ]]; then
+        rm "${TARGET}/${HOOK_NAME}"
+    else
+        echo "Hook not previously installed, no action taken."
+    fi
+else
+    echo "Adding hook ${HOOK_NAME} to ${TARGET}"
+    if [[ ! -f ${TARGET}/${HOOK_NAME} ]]; then
+        ln -s "${SOURCE}/commitments" "${TARGET}/${HOOK_NAME}"
+    else
+        echo "Hook already installed, no action taken."
+    fi
+
+    ENV_DIR=${XDG_CONFIG_HOME:-"${HOME}/.config"}
+    ENV_FILE="${ENV_DIR}/commitments/env"
+    if [[ ! -f ${ENV_FILE} ]]; then
+        echo "Creating env-file ${ENV_FILE}"
+        mkdir -p "${ENV_DIR}/commitments"
+        cat > ${ENV_FILE} << EOF
+# You may add your own plugins to the search path below. The format
+# of each plugin is a directory containing a file named 'commitments'.
+# This file contains the functions called by the hook script.
+
+export CMT_PLUGIN_PATH=${SOURCE}/plugins
+EOF
+    fi
+fi
